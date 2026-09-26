@@ -1,0 +1,6 @@
+{
+  "name": "BedsideLogic Pro",
+  "description": "Klinisk dokumentasjons- og effektivitetsassistent for sjukepleiarar og helsepersonell med personvern-brannmur, SOAP/SBAR-generator og tale-til-tekst.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
