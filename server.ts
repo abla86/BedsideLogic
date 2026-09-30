@@ -30,27 +30,51 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-// Server-side PII detector & sanitizer
+// Server-side PII detector & sanitizer with strict Guard Dog rules
 function sanitizePII(text: string): { sanitized: string; violations: string[] } {
   const violations: string[] = [];
   let sanitized = text;
 
-  // 11 digits (Norwegian fødselsnummer)
-  const fnrRegex = /\b\d{6}\s?\d{5}\b/g;
-  if (fnrRegex.test(sanitized)) {
-    violations.push("Mogleg fødselsnummer (11 siffer)");
-    sanitized = sanitized.replace(fnrRegex, "[PERSONVERN-SLETTA FØDSELSNR]");
+  // 11 digits: Norwegian fødselsnummer / D-nummer (DDMMYY XXXXX, DDMMYY-XXXXX, or 11 continuous digits)
+  const fnrRegex = /\b(?:\d{6}[-\s]\d{5}|\d{11})\b/g;
+  const fnrMatches = sanitized.match(fnrRegex);
+  if (fnrMatches && fnrMatches.length > 0) {
+    violations.push(`Mogleg fødselsnummer oppdaga (11 siffer: ${fnrMatches.join(", ")})`);
+    sanitized = sanitized.replace(fnrRegex, "[PERSONVERN-SLETTA]");
   }
 
-  // 8 digits (Norwegian phone number)
-  const phoneRegex = /\b(?:\+47\s?)?[49]\d{2}\s?\d{2}\s?\d{3}\b|\b\d{8}\b/g;
-  if (phoneRegex.test(sanitized)) {
-    violations.push("Mogleg telefonnummer (8 siffer)");
-    sanitized = sanitized.replace(phoneRegex, "[PERSONVERN-SLETTA TLF]");
+  // 8 digits: Norwegian phone numbers (8 continuous digits, or standard groupings like 2+2+2+2 or 3+2+3, with optional +47 / 0047)
+  const phoneRegex = /\b(?:\+47[-\s]?|0047[-\s]?)?(?:[49]\d{7}|[235678]\d{7}|\d{2}[-\s]\d{2}[-\s]\d{2}[-\s]\d{2}|\d{3}[-\s]\d{2}[-\s]\d{3})\b/g;
+  const phoneMatches = sanitized.match(phoneRegex);
+  if (phoneMatches && phoneMatches.length > 0) {
+    violations.push(`Mogleg telefonnummer oppdaga (8 siffer: ${phoneMatches.join(", ")})`);
+    sanitized = sanitized.replace(phoneRegex, "[PERSONVERN-SLETTA]");
+  }
+
+  // Explicit name patterns (e.g. "Pasient Ola Nordmann", "fru Olsen", "herr Berg")
+  const nameRegex = /\b(?:pasient|innlagt|fru|herr|pårørande|pårørende)\s+([A-ZÆØÅ][a-zæøå]+(?:\s+[A-ZÆØÅ][a-zæøå]+)+)/gi;
+  const nameMatches = sanitized.match(nameRegex);
+  if (nameMatches && nameMatches.length > 0) {
+    violations.push(`Mogleg pasientnamn oppdaga (${nameMatches.join(", ")})`);
+    sanitized = sanitized.replace(nameRegex, "[PERSONVERN-SLETTA]");
   }
 
   return { sanitized, violations };
 }
+
+// Dedicated Guard Dog system prompt layer: Enforces strict PII redaction, non-confirmation of deleted info, and omission of irrelevant sensitive details
+const GUARD_DOG_SYSTEM_PROMPT = `=== [GUARD DOG SIKKERHEITSLAG - HØGSTE PRIORITET] ===
+Du har eit ufråvikeleg "Guard Dog"-sikkerheitslag aktivert. Før du prosesserer, strukturerer eller genererer tekst, SKAL du følgje desse 4 reglane:
+
+1. SKANN OG ERSTATT PERSONIDENTIFISERBAR INFORMASJON (PII):
+   - Viss teksten inneheld personnamn (pasient, pårørande eller helsepersonell), personnummer / fødselsnummer (11 siffer), D-nummer, telefonnummer (8 siffer), adresse, eller andre direkte identifiserande kjenneteikn, SKAL du omgåande erstatte dei med merkelappen: [PERSONVERN-SLETTA].
+2. SLETT UTAN Å STADFESTE ELLER BEKREFTE:
+   - Du skal ALDRI gjenta, stadfeste, bekrefte, nemne eller spekulere i kva den sletta eller anonymiserte informasjonen var. Skriv aldri f.eks. "Pasienten, som heiter...", eller "Tlf-nummeret var...". Erstatt det utelukkande med [PERSONVERN-SLETTA] nøytralt utan kommentar.
+3. UTELAT IRRELEVANTE SENSITIVE DETALJAR:
+   - Utelat private, irrelevante eller ikkje-medisinske sensitive detaljar som ikkje har klinisk relevans for den faglege dokumentasjonen.
+4. BEVAR REINE KLINISKE PARAMETRAR:
+   - Vitale målingar (blodtrykk, puls, temperatur, SpO2, RF, NEWS2, NRS/VAS-smerteskår, doseringar) er kliniske observasjonar og skal bevarast uendra for pasienttryggleiken.
+=====================================================`;
 
 // System prompts engineered specifically for Norwegian clinical nursing
 const SYSTEM_PROMPTS = {
@@ -175,7 +199,7 @@ app.post("/api/generate", async (req, res) => {
       ? "Ta med grundige kliniske resonnement og detaljerte tiltak."
       : "Standard klinisk journalnotatnivå for DIPS/Gerica/CosDoc.";
 
-    const fullSystemInstruction = `${basePrompt}\n\nMÅLFORM:\n${languageInstruction}\n\nTONE:\n${toneInstruction}`;
+    const fullSystemInstruction = `${GUARD_DOG_SYSTEM_PROMPT}\n\n${basePrompt}\n\nMÅLFORM:\n${languageInstruction}\n\nTONE:\n${toneInstruction}`;
 
     const client = getGeminiClient();
 

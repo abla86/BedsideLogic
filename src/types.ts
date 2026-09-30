@@ -20,7 +20,11 @@ export interface PIIStatus {
   hasFodselsnummer: boolean;
   hasPhone: boolean;
   hasPotentialName: boolean;
+  hasViolation: boolean;
   matches: string[];
+  birthNumberMatches: string[];
+  phoneMatches: string[];
+  nameMatches: string[];
 }
 
 export interface GeneratedNote {

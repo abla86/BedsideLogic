@@ -20,8 +20,10 @@ import {
   Info,
   Layers,
   ShieldCheck,
+  Wand2,
+  Lock,
 } from 'lucide-react';
-import { NoteType, LanguageMode, ToneMode, PIIStatus, GeneratedNote, MalTemplate } from '../types';
+import { NoteType, LanguageMode, ToneMode, PIIStatus, GeneratedNote } from '../types';
 import { CLINICAL_PRESETS } from '../data/presets';
 import { CLINICAL_MALER, getMalTemplate } from '../data/templates';
 import { checkPII, anonymizeText } from '../utils/security';
@@ -34,6 +36,7 @@ interface DocumentationGeneratorProps {
   freeGenerationsLimit: number;
   onOpenProModal: () => void;
   onSaveNote: (note: GeneratedNote) => void;
+  onOpenEula: () => void;
 }
 
 export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
@@ -43,10 +46,11 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
   freeGenerationsLimit,
   onOpenProModal,
   onSaveNote,
+  onOpenEula,
 }) => {
   // Active template selection: defaults to SOAP
   const [activeType, setActiveType] = useState<NoteType>('soap');
-  // Active system-prompt dispatched to API
+  // Active system-prompt dispatched to API (includes Guard Dog layer by default)
   const [activeSystemPrompt, setActiveSystemPrompt] = useState<string>(() => {
     return getMalTemplate('soap').defaultPrompt;
   });
@@ -62,7 +66,11 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
     hasFodselsnummer: false,
     hasPhone: false,
     hasPotentialName: false,
+    hasViolation: false,
     matches: [],
+    birthNumberMatches: [],
+    phoneMatches: [],
+    nameMatches: [],
   });
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -72,7 +80,7 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
   const currentTemplate = getMalTemplate(activeType);
   const isCustomPromptModified = activeSystemPrompt.trim() !== currentTemplate.defaultPrompt.trim();
 
-  // Monitor input for sensitive PII in real-time
+  // Real-time regex validation for 11 digits (fødselsnummer) & 8 digits (telefonnummer)
   useEffect(() => {
     const status = checkPII(rawInput);
     setPiiStatus(status);
@@ -173,6 +181,9 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
     setTimeout(() => setPromptCopied(false), 2000);
   };
 
+  // PII blocking condition: strict enforcement
+  const isBlockedByPII = piiStatus.hasViolation;
+
   // Generate note using active system prompt & input
   const handleGenerate = async () => {
     // Check free limit
@@ -185,9 +196,10 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
       return;
     }
 
-    // Strict safety check: Block if active 11-digit number is present
-    if (piiStatus.hasFodselsnummer) {
+    // Strict safety check: If any PII pattern remains, auto-anonymize or abort
+    if (isBlockedByPII) {
       handleAnonymize();
+      return;
     }
 
     setIsLoading(true);
@@ -372,8 +384,7 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
         </div>
 
         {/* ========================================================================= */}
-        {/* AKTIV SYSTEM-PROMPT INSPEKSJON OG TILPASSING                              */}
-        {/* Gir full transparens over prompten som sendast ved API-kall               */}
+        {/* AKTIV SYSTEM-PROMPT MED GUARD DOG LAYER                                   */}
         {/* ========================================================================= */}
         <div
           id="active-system-prompt-panel"
@@ -381,7 +392,7 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="flex items-center space-x-2.5">
-              <div className="p-1.5 rounded-lg bg-[#0F6E6E] text-white">
+              <div className="p-1.5 rounded-lg bg-[#0F6E6E] text-white flex-shrink-0">
                 <Sliders className="w-3.5 h-3.5" />
               </div>
               <div>
@@ -389,14 +400,13 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
                   <span className="text-xs font-bold text-slate-800">
                     Aktiv system-prompt for {currentTemplate.label}
                   </span>
-                  {isCustomPromptModified ? (
+                  <span className="text-[10px] font-bold text-[#0F6E6E] bg-teal-100/80 px-2 py-0.5 rounded-full flex items-center space-x-1">
+                    <ShieldCheck className="w-3 h-3 text-[#0F6E6E]" />
+                    <span>Guard Dog PII-lag inkludert</span>
+                  </span>
+                  {isCustomPromptModified && (
                     <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
                       Tilpassa av brukar
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full flex items-center space-x-1">
-                      <ShieldCheck className="w-3 h-3" />
-                      <span>Standard mal-prompt</span>
                     </span>
                   )}
                 </div>
@@ -495,8 +505,7 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
 
               <div className="flex items-center justify-between text-[11px] text-slate-500">
                 <span className="italic">
-                  Tips: Når du vel ein ny mal over (SOAP, SBAR, Forenkling), oppdaterast denne
-                  prompten automatisk til den valde malen sin standard.
+                  Tips: Guard Dog-laget er alltid aktivt og erstattar namn, 11-sifra personnr og 8-sifra tlf med [PERSONVERN-SLETTA].
                 </span>
               </div>
             </div>
@@ -623,7 +632,9 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
                   ? 'Lim inn eller skriv inn medisinsk fagtekst som pasienten eller pårørande treng å få forklart på eit enkelt norsk...'
                   : 'Kva pasientsituasjon eller avdeling gjeld dette? F.eks: Nyoperert hofte, palliativ pasient, KOLS-innlegging...'
               }
-              className="w-full p-3.5 text-sm bg-[#FAF8F5] border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#0F6E6E] focus:border-transparent outline-none transition-all resize-y font-normal text-slate-800 placeholder:text-slate-400"
+              className={`w-full p-3.5 text-sm bg-[#FAF8F5] border rounded-xl focus:ring-2 focus:ring-[#0F6E6E] focus:border-transparent outline-none transition-all resize-y font-normal text-slate-800 placeholder:text-slate-400 ${
+                isBlockedByPII ? 'border-[#E8785A] ring-1 ring-[#E8785A]/30' : 'border-slate-200'
+              }`}
             />
           </div>
 
@@ -655,19 +666,54 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
             </div>
           </div>
 
-          {/* Submit Button */}
+          {/* REAL-TIME VALIDATION WARNING MESSAGE (If 11-digit or 8-digit PII detected) */}
+          {isBlockedByPII && (
+            <div
+              id="pii-blocked-warning"
+              className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-rose-900 animate-in fade-in duration-150"
+            >
+              <div className="flex items-start space-x-2.5">
+                <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-extrabold text-rose-800">
+                    Generering er sperra inntil teksten er anonymisert:
+                  </div>
+                  <div className="text-[11px] text-rose-700 mt-0.5">
+                    {piiStatus.hasFodselsnummer && piiStatus.hasPhone
+                      ? 'Oppdaga både mønster for fødselsnummer (11 siffer) og telefonnummer (8 siffer).'
+                      : piiStatus.hasFodselsnummer
+                      ? 'Oppdaga mønster som liknar fødselsnummer (11 siffer).'
+                      : piiStatus.hasPhone
+                      ? 'Oppdaga mønster som liknar telefonnummer (8 siffer).'
+                      : 'Oppdaga pasientnamn.'}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAnonymize}
+                className="w-full sm:w-auto px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-lg font-bold text-xs whitespace-nowrap cursor-pointer transition-colors shadow-xs flex items-center justify-center space-x-1.5 flex-shrink-0"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                <span>Anonymiser no (1-klikk)</span>
+              </button>
+            </div>
+          )}
+
+          {/* Submit Button: Strictly disabled if isBlockedByPII, empty, or loading */}
           <button
             id="btn-generate-note"
             type="button"
             onClick={handleGenerate}
-            disabled={isLoading || !rawInput.trim() || piiStatus.hasFodselsnummer}
+            disabled={isLoading || !rawInput.trim() || isBlockedByPII}
             className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center space-x-2 transition-all shadow-sm cursor-pointer ${
               isLoading
                 ? 'bg-teal-700 text-teal-200 cursor-wait'
                 : !rawInput.trim()
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                : piiStatus.hasFodselsnummer
-                ? 'bg-amber-600 text-white cursor-not-allowed'
+                : isBlockedByPII
+                ? 'bg-rose-100 text-rose-700 border border-rose-300 cursor-not-allowed shadow-none'
                 : 'bg-[#0F6E6E] hover:bg-[#0B5454] text-white active:scale-[0.99] shadow-md hover:shadow-lg'
             }`}
           >
@@ -676,10 +722,18 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 <span>Genererer med aktiv {currentTemplate.label}-prompt...</span>
               </>
-            ) : piiStatus.hasFodselsnummer ? (
+            ) : isBlockedByPII ? (
               <>
-                <AlertTriangle className="w-4 h-4 text-amber-200" />
-                <span>Anonymiser fødselsnummer før generering</span>
+                <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                <span>
+                  {piiStatus.hasFodselsnummer && piiStatus.hasPhone
+                    ? 'Sperra: Anonymiser 11-sifra personnr og 8-sifra tlf først'
+                    : piiStatus.hasFodselsnummer
+                    ? 'Sperra: Anonymiser 11-sifra fødselsnummer først'
+                    : piiStatus.hasPhone
+                    ? 'Sperra: Anonymiser 8-sifra telefonnummer først'
+                    : 'Sperra: Anonymiser pasientnamn først'}
+                </span>
               </>
             ) : (
               <>
@@ -689,9 +743,24 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
             )}
           </button>
 
+          {/* Legal / EULA notice directly under the action */}
+          <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-slate-500">
+            <div className="flex items-center space-x-1.5">
+              <Lock className="w-3.5 h-3.5 text-teal-700 flex-shrink-0" />
+              <span>Null serverlagring • Formuleringsverktøy, ikkje journal</span>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenEula}
+              className="text-[#0F6E6E] hover:underline font-semibold text-left sm:text-right cursor-pointer"
+            >
+              Sluttbrukaravtale (EULA) →
+            </button>
+          </div>
+
           {/* Usage counter for free tier */}
           {!isPro && (
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <div className="pt-1 flex items-center justify-between text-xs text-slate-500">
               <span>
                 Gratis-kvote: {Math.max(0, freeGenerationsLimit - freeGenerationsUsed)} av{' '}
                 {freeGenerationsLimit} att denne veka
@@ -700,7 +769,7 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
                 id="btn-upgrade-hint"
                 type="button"
                 onClick={onOpenProModal}
-                className="text-[#E8785A] font-bold hover:underline"
+                className="text-[#E8785A] font-bold hover:underline cursor-pointer"
               >
                 Få uavgrensa med Pro →
               </button>
@@ -769,7 +838,7 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
                     <span>Estimert tidssparing: ca. 12–15 minutt</span>
                   </span>
                   <span className="text-[11px] text-slate-400">
-                    Hugs: Kontroller alltid opplysningane før innføring i journal.
+                    Hugs: Kontroller alltid opplysningane før innføring i journal (jf. EULA).
                   </span>
                 </div>
               </div>
@@ -783,8 +852,8 @@ export const DocumentationGenerator: React.FC<DocumentationGeneratorProps> = ({
                 </h4>
                 <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
                   Vel ein mal (SOAP, SBAR eller Forenkling), skriv eller dikter stikkorda dine til
-                  venstre, eller klikk på eit av dei kliniske døma over for å sjå korleis rotete notat
-                  blir til eit DIPS-klart journalnotat.
+                  venstre. Guard Dog-brannmuren passar på at ingen fødselsnummer eller telefonnummer
+                  blir sendt vidare.
                 </p>
               </div>
             )}
