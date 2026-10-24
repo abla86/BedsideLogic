@@ -5,8 +5,9 @@ import { ProModal } from './components/ProModal';
 import { PromptLibraryModal } from './components/PromptLibraryModal';
 import { HistoryDrawer } from './components/HistoryDrawer';
 import { DisclaimerFooter } from './components/DisclaimerFooter';
+import { EulaModal } from './components/EulaModal';
 import { LanguageMode, GeneratedNote } from './types';
-import { Sparkles, Clock, CheckCircle2, Shield, Heart } from 'lucide-react';
+import { Sparkles, Clock, CheckCircle2, Shield } from 'lucide-react';
 
 export default function App() {
   const [language, setLanguage] = useState<LanguageMode>(() => {
@@ -34,6 +35,10 @@ export default function App() {
   const [isProModalOpen, setIsProModalOpen] = useState<boolean>(false);
   const [isPromptLibraryOpen, setIsPromptLibraryOpen] = useState<boolean>(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
+  const [isEulaOpen, setIsEulaOpen] = useState<boolean>(false);
+  const [isEulaAccepted, setIsEulaAccepted] = useState<boolean>(() => {
+    return localStorage.getItem('bedsidelogic_eula_accepted') === 'true';
+  });
 
   // Sync states to localStorage
   useEffect(() => {
@@ -79,6 +84,11 @@ export default function App() {
     }
   };
 
+  const handleAcceptEula = () => {
+    setIsEulaAccepted(true);
+    localStorage.setItem('bedsidelogic_eula_accepted', 'true');
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F6F2] text-[#1D2E2E] font-sans antialiased">
       {/* Top Navigation */}
@@ -89,6 +99,7 @@ export default function App() {
         onOpenProModal={() => setIsProModalOpen(true)}
         onOpenPromptLibrary={() => setIsPromptLibraryOpen(true)}
         onOpenHistory={() => setIsHistoryOpen(true)}
+        onOpenEula={() => setIsEulaOpen(true)}
         savedCount={savedNotes.length}
       />
 
@@ -128,8 +139,8 @@ export default function App() {
 
             <p className="text-xs sm:text-sm text-teal-100/90 mt-2 leading-relaxed">
               {language === 'nynorsk'
-                ? 'Strukturer SOAP-notat for journalen, førebu SBAR-overlevering til lege, eller forenkle medisinsk fagspråk for pårørande med 3-lags personvernsikring.'
-                : 'Strukturer SOAP-notat for journalen, forbered SBAR-overlevering til lege, eller forenkle medisinsk fagspråk for pårørende med 3-lags personvernsikring.'}
+                ? 'Strukturer SOAP-notat for journalen, førebu SBAR-overlevering til lege, eller forenkle medisinsk fagspråk for pårørande med Guard Dog-sikring og null serverlagring.'
+                : 'Strukturer SOAP-notat for journalen, forbered SBAR-overlevering til lege, eller forenkle medisinsk fagspråk for pårørende med Guard Dog-sikring og null serverlagring.'}
             </p>
 
             {/* Shift efficiency metrics */}
@@ -148,8 +159,8 @@ export default function App() {
                   <Shield className="w-3 h-3 text-emerald-300" />
                   <span>Personvern</span>
                 </div>
-                <div className="text-base sm:text-lg font-bold text-white mt-0.5">100% anonym</div>
-                <div className="text-[10px] text-teal-200/70">ingen data vert lagra</div>
+                <div className="text-base sm:text-lg font-bold text-white mt-0.5">Guard Dog</div>
+                <div className="text-[10px] text-teal-200/70">null serverlagring</div>
               </div>
 
               <div className="bg-white/10 rounded-xl p-2.5 border border-white/10 col-span-2 sm:col-span-1">
@@ -172,11 +183,12 @@ export default function App() {
           freeGenerationsLimit={3}
           onOpenProModal={() => setIsProModalOpen(true)}
           onSaveNote={handleSaveNote}
+          onOpenEula={() => setIsEulaOpen(true)}
         />
       </main>
 
       {/* Educational and Legal Disclaimer Footer */}
-      <DisclaimerFooter language={language} />
+      <DisclaimerFooter language={language} onOpenEula={() => setIsEulaOpen(true)} />
 
       {/* Pro Monetization Modal */}
       <ProModal
@@ -202,6 +214,15 @@ export default function App() {
         onDeleteNote={handleDeleteNote}
         onClearAll={handleClearAllNotes}
         language={language}
+      />
+
+      {/* End-User License Agreement (EULA) Modal */}
+      <EulaModal
+        isOpen={isEulaOpen}
+        onClose={() => setIsEulaOpen(false)}
+        language={language}
+        onAccept={handleAcceptEula}
+        isAccepted={isEulaAccepted}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Sparkles, BookOpen, Clock, Crown, Stethoscope } from 'lucide-react';
+import { ShieldCheck, Sparkles, BookOpen, Clock, Crown, Stethoscope, FileCheck } from 'lucide-react';
 import { LanguageMode } from '../types';
 
 interface NavbarProps {
@@ -9,6 +9,7 @@ interface NavbarProps {
   onOpenProModal: () => void;
   onOpenPromptLibrary: () => void;
   onOpenHistory: () => void;
+  onOpenEula: () => void;
   savedCount: number;
 }
 
@@ -19,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenProModal,
   onOpenPromptLibrary,
   onOpenHistory,
+  onOpenEula,
   savedCount,
 }) => {
   return (
@@ -46,10 +48,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Center: Privacy badge */}
+          {/* Center: Privacy badge with Guard Dog indication */}
           <div className="hidden md:flex items-center space-x-2 bg-[#0B5454]/80 px-3 py-1.5 rounded-full border border-teal-400/20 text-xs text-teal-100">
-            <ShieldCheck className="w-4 h-4 text-teal-300" />
-            <span>3-lags personvern-brannmur aktiv</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>Guard Dog personvern aktiv (11 & 8-siffer filter)</span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
           </div>
 
@@ -83,11 +85,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
+            {/* EULA button */}
+            <button
+              id="btn-nav-eula"
+              type="button"
+              onClick={onOpenEula}
+              className="p-2 rounded-lg text-teal-100 hover:text-white hover:bg-white/10 transition-colors flex items-center space-x-1.5 text-xs font-medium cursor-pointer"
+              title="Sluttbrukaravtale og vilkår (EULA)"
+            >
+              <FileCheck className="w-4 h-4 text-teal-300" />
+              <span className="hidden xl:inline">EULA</span>
+            </button>
+
             {/* Prompt library (Free Tier item) */}
             <button
               id="btn-nav-prompt-library"
               onClick={onOpenPromptLibrary}
-              className="p-2 rounded-lg text-teal-100 hover:text-white hover:bg-white/10 transition-colors flex items-center space-x-1.5 text-xs font-medium"
+              className="p-2 rounded-lg text-teal-100 hover:text-white hover:bg-white/10 transition-colors flex items-center space-x-1.5 text-xs font-medium cursor-pointer"
               title="Opne ChatGPT Prompt-bibliotek"
             >
               <BookOpen className="w-4 h-4" />
@@ -98,7 +112,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="btn-nav-history"
               onClick={onOpenHistory}
-              className="relative p-2 rounded-lg text-teal-100 hover:text-white hover:bg-white/10 transition-colors flex items-center space-x-1 text-xs font-medium"
+              className="relative p-2 rounded-lg text-teal-100 hover:text-white hover:bg-white/10 transition-colors flex items-center space-x-1 text-xs font-medium cursor-pointer"
               title="Sjå lokalt lagra notat"
             >
               <Clock className="w-4 h-4" />
@@ -115,7 +129,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="btn-nav-pro-active"
                 onClick={onOpenProModal}
-                className="bg-white/15 hover:bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-teal-200/30 flex items-center space-x-1.5 transition-all shadow-sm"
+                className="bg-white/15 hover:bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-teal-200/30 flex items-center space-x-1.5 transition-all shadow-sm cursor-pointer"
               >
                 <Crown className="w-3.5 h-3.5 text-amber-300" />
                 <span>Pro Aktiv</span>
@@ -124,7 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="btn-nav-upgrade-pro"
                 onClick={onOpenProModal}
-                className="bg-[#E8785A] hover:bg-[#D6684B] text-white text-xs font-bold px-3.5 py-1.5 rounded-lg shadow-sm flex items-center space-x-1.5 transition-all hover:shadow hover:scale-[1.02] active:scale-[0.98]"
+                className="bg-[#E8785A] hover:bg-[#D6684B] text-white text-xs font-bold px-3.5 py-1.5 rounded-lg shadow-sm flex items-center space-x-1.5 transition-all hover:shadow hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Oppgrader</span>
