@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Youtube, HeartHandshake, CheckCircle2, FileText, Lock } from 'lucide-react';
+import { ShieldCheck, HeartHandshake, CheckCircle2, FileText, Lock } from 'lucide-react';
 import { LanguageMode } from '../types';
 
 interface DisclaimerFooterProps {
